@@ -28,9 +28,11 @@ public class StatementController {
     @ResponseBody
     public ResponseEntity<String> statement(@RequestBody String statementReq) {
         LinkedHashMap<String, Object> requestData = new LinkedHashMap<>();
+        String responseMessage = "";
 
         if (!this.helper.validateXmlSchema("C:\\Users\\costa\\Documents\\Projects\\xmlAPI\\src\\main\\resources\\StatementReq.xsd", statementReq)) {
-            return new ResponseEntity<>(this.helper.DocumentToXml(this.helper.getDemandResponse("TARATZT", "TANZTZT", this.helper.getRandomMessageId(), this.helper.getCurrentDateTime(), this.helper.getResponseStatus("RGS003"), "RGS003", this.helper.getResponseDescription("RGS003"))), HttpStatus.OK);
+            responseMessage = this.helper.getResponseMessage("TARATZT", "TANZTZT", this.helper.getRandomMessageId(), this.helper.getCurrentDateTime(), this.helper.getResponseStatus("RGS004"), "RGS004", this.helper.getResponseDescription("RGS004"));
+            return new ResponseEntity<>(this.helper.DocumentToXml(this.helper.signRequestAndGetFullResponse(responseMessage)), HttpStatus.OK);
         }
         try {
             Document document = DocumentHelper.parseText(statementReq);
@@ -59,6 +61,8 @@ public class StatementController {
         String creDtTm = requestData.get("CreDtTm").toString();
         String acctNum = requestData.get("AcctNum").toString();
         String tmDt = requestData.get("SmDt").toString();
-        return new ResponseEntity<>(this.helper.DocumentToXml(this.helper.getDemandResponse(sender, receiver, this.helper.getRandomMessageId(), this.helper.getCurrentDateTime(), this.helper.getResponseStatus("RGS001"), "RGS001", this.helper.getResponseDescription("RGS001"))), HttpStatus.OK);
+
+        responseMessage = this.helper.getResponseMessage(sender, receiver, this.helper.getRandomMessageId(), this.helper.getCurrentDateTime(), this.helper.getResponseStatus("RGS001"), "RGS001", this.helper.getResponseDescription("RGS001"));
+        return new ResponseEntity<>(this.helper.DocumentToXml(this.helper.signRequestAndGetFullResponse(responseMessage)), HttpStatus.OK);
     }
 }

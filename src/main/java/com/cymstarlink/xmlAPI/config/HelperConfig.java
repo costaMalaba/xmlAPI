@@ -14,14 +14,51 @@ import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 import javax.xml.validation.Validator;
 import java.io.File;
+import java.io.IOException;
 import java.io.StringReader;
+import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.security.KeyFactory;
+import java.security.Signature;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.spec.PKCS8EncodedKeySpec;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Base64;
 
 @Service
 public class HelperConfig {
 
     private final ResponseCodeService responseCodeService;
+    private static final String SIGNING_ALGORITHM = "SHA1withRSA";
+    private static final String ALGORITHM = "RSA";
+
+    private static final String PRIVATE_KEY_STRING = "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC1YUm4CxIGaMLc\n" +
+            "Nk5coYuQzwKXQMrbRiMKGiS0IWrYGzsVtJBbhswAWkFRFAqLX+Sf6mLeahiAtKc3\n" +
+            "adAvs0rdBifyIEZ4/y9mCAbJmckErmCErbcMOeaPI1mMOtgUaCmomxU+vDhdukA6\n" +
+            "+YH5IWdDqT+DZ2S+oLO9Ly3CKHRfuYNo7Zs8lzrolDla6dWZBwknHjPI/x4lXKqF\n" +
+            "GU4/SPIZlM6kUdthuSNMd4S5kUWfH+OWMPePItZSbRloJgGLMshSdekWDnypAFVh\n" +
+            "YnJq+Gfif2sH01/FRdMMOHrmqBulUj2oVtFWd0tXY0dI6vsloY+F088390BZxrPy\n" +
+            "onrVtWBVAgMBAAECggEAE8FO6C68fdo3LwjzK/+kVddWLuctsQhIlLcYPE5Pds4w\n" +
+            "d0K9XlqmKXurFYubQmblXc2HizX/CTWj6NMri6Z5hu0+uI5vXopcvT4ujxKi5FGh\n" +
+            "zZGmGDzOMdTl0fIuyro1n1mUzMpvUTYR/NpkH6BVwPbUJhnCzUhvizFySG1jj3FU\n" +
+            "GUsAg0Ft/eNCnd9wU5zSehYaA/HXbUAxcPfdDnFHFyx4HUcBWdWZkpCf43neik5B\n" +
+            "0bnxhG8oP2cPjSV8tkY+yOVGbkojm/dLjLlrD/JuqE77ShEIkd2puTLS6JzdTdiK\n" +
+            "nuZluzaYhGqHW03taz8mTW8cWZmzwIqTEPjTi4TmAQKBgQDphn3IIF5gKcFwJd0N\n" +
+            "sRd4qFn5UrxaVsmdDQn4HE/T0C1cLsmdf6iTrh9vMwzZMsy0gYnbb5HhVkJoa++F\n" +
+            "370wOgq1hPYiz+3f85OrCLBcXE6llUdUAoDcOn7lZJG9p6ZMnzYi8wpuzIOdZ0RH\n" +
+            "7YwvKimM4Ond4O+rIvsHGm7ZwQKBgQDG1g9bPgInBH+0uVDYJpXmdyR8F5V9nfS4\n" +
+            "7ks6p0z8aiDR3hKVgWl0SLFewcYgYmXUM27Uc+UkYK7/KYIXHVSPlylOjWqgo/Xb\n" +
+            "NhyKXZDBnfIYQbAspu4mtAJ05ErNymQf0qYlVCKhwqQjCY7cNLEdoR6cZ+gb4dbV\n" +
+            "U37VxbtjlQKBgEzcCRYPIUDBPXtt2t2gxbreng5jXr7VBbJ9EiTpHJT4VZWbiJwf\n" +
+            "4hoJGyt8P+RUxe87G2ZvyDHENEMuEz2asCfpUpD/3AsFKKOnBZkrWPBtKS1yfnF2\n" +
+            "CXdygUV63kTvotphJG5IU8y33zG1RVHvK05ysA5AEHkIiZln//sMhiOBAoGBAL84\n" +
+            "kC4slT9W2UZBzlkByrmIrULWH4NeTEMpkJnI2YYKvqN2kaLMgVE+s62wZ00vtER+\n" +
+            "bkDNcHoqrUFhduWp5G/vbN9Jq1jwNfpqsMn0r8k0j+X6Dmby5ye7iH1ILBR7Zw0f\n" +
+            "tX9CyceNe/LiN0zZM9iN4fWDDDr8V3JzSRBniA59AoGAcV0AlfjVYmUBDWE1o/A1\n" +
+            "AM4EQFQScPUtLeOMYzYu0kRmbcgvPdtBDEIJegtTM9fwppKuMJ0ET+V+Gsrz2T9j\n" +
+            "m0lMw+42MMOlynUDP47+DLH78F4In6yaExvlkRsUUgV605W4RJuztwuXG3kCxLhZ\n" +
+            "dd1M1zpdMQCktBb3gThGLko=";
 
     public HelperConfig(ResponseCodeService responseCodeService) {
         this.responseCodeService = responseCodeService;
@@ -50,9 +87,8 @@ public class HelperConfig {
         responseCodeService.save(responseCodeEntity);
     }
 
-    public String getDemandResponse(String sender, String receiver, String messageId, String dateTime, String status, String code, String description) {
-        String rawResponse = "<Rgs>\n" +
-                "<RgsAck>\n" +
+    public String getResponseMessage(String sender, String receiver, String messageId, String dateTime, String status, String code, String description) {
+        String rawResponse = "<RgsAck>\n" +
                 "<Header>\n" +
                 "<Sender>" + sender + "</Sender>\n" +
                 "<Receiver>" + receiver + "</Receiver>\n" +
@@ -65,9 +101,7 @@ public class HelperConfig {
                 "<RespStatusCode>" + code + "</RespStatusCode>\n" +
                 "<Description>" + description + "</Description>\n" +
                 "</ResponseSummary>\n" +
-                "</RgsAck>\n" +
-                "<RgsSignature>" + "Signature Goes Here" + "</RgsSignature>\n" +
-                "</Rgs>";
+                "</RgsAck>";
         return rawResponse;
     }
 
@@ -106,5 +140,38 @@ public class HelperConfig {
     public String getRandomMessageId() {
         String mills = String.valueOf(System.currentTimeMillis());
         return String.format("TR%s%s", mills, RandomStringUtils.random(5, true, true)).toUpperCase();
+    }
+
+    public String signRequestAndGetFullResponse(String messageToSign) {
+        String incomingMessage = messageToSign;
+        incomingMessage = incomingMessage.replaceAll("\\r\\n|\\r|\\n", "");
+        return "<Rgs>" + messageToSign + "<RgsSignature>" + getDigitalSignature(incomingMessage) + "</RgsSignature></Rgs>";
+    }
+
+    private String getDigitalSignature(String messageToSign) {
+        String signature = "";
+        try {
+            signature = signMessage(messageToSign);
+        } catch (Exception e) {
+            signature = "EXCEPTION - " + e.getMessage();
+            e.printStackTrace();
+        }
+
+        return signature;
+    }
+
+    private String signMessage(String messageToSign) throws Exception {
+        Signature signature = Signature.getInstance(SIGNING_ALGORITHM);
+        signature.initSign(getPrivateKeyFromString());
+        signature.update(messageToSign.trim().getBytes(StandardCharsets.UTF_8));
+        byte[] messageSignature =signature.sign();
+        return java.util.Base64.getEncoder().encodeToString(messageSignature);
+    }
+
+    private static RSAPrivateKey getPrivateKeyFromString() throws IOException, GeneralSecurityException {
+        byte[] encoded = org.apache.tomcat.util.codec.binary.Base64.decodeBase64(PRIVATE_KEY_STRING);
+        KeyFactory kf = KeyFactory.getInstance(ALGORITHM);
+        PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(encoded);
+        return (RSAPrivateKey) kf.generatePrivate(keySpec);
     }
 }
