@@ -2,6 +2,7 @@ package com.cymstarlink.xmlAPI.config;
 
 import com.cymstarlink.xmlAPI.entities.ResponseCodeEntity;
 import com.cymstarlink.xmlAPI.services.ResponseCodeService;
+import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
@@ -21,10 +22,11 @@ import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
 import java.security.Signature;
 import java.security.interfaces.RSAPrivateKey;
+import java.security.interfaces.RSAPublicKey;
 import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Base64;
 
 @Service
 public class HelperConfig {
@@ -59,6 +61,14 @@ public class HelperConfig {
             "AM4EQFQScPUtLeOMYzYu0kRmbcgvPdtBDEIJegtTM9fwppKuMJ0ET+V+Gsrz2T9j\n" +
             "m0lMw+42MMOlynUDP47+DLH78F4In6yaExvlkRsUUgV605W4RJuztwuXG3kCxLhZ\n" +
             "dd1M1zpdMQCktBb3gThGLko=";
+
+    private static final String PUBLIC_KEY_STRING = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtWFJuAsSBmjC3DZOXKGL\n" +
+            "kM8Cl0DK20YjChoktCFq2Bs7FbSQW4bMAFpBURQKi1/kn+pi3moYgLSnN2nQL7NK\n" +
+            "3QYn8iBGeP8vZggGyZnJBK5ghK23DDnmjyNZjDrYFGgpqJsVPrw4XbpAOvmB+SFn\n" +
+            "Q6k/g2dkvqCzvS8twih0X7mDaO2bPJc66JQ5WunVmQcJJx4zyP8eJVyqhRlOP0jy\n" +
+            "GZTOpFHbYbkjTHeEuZFFnx/jljD3jyLWUm0ZaCYBizLIUnXpFg58qQBVYWJyavhn\n" +
+            "4n9rB9NfxUXTDDh65qgbpVI9qFbRVndLV2NHSOr7JaGPhdPPN/dAWcaz8qJ61bVg\n" +
+            "VQIDAQAB";
 
     public HelperConfig(ResponseCodeService responseCodeService) {
         this.responseCodeService = responseCodeService;
@@ -169,9 +179,32 @@ public class HelperConfig {
     }
 
     private static RSAPrivateKey getPrivateKeyFromString() throws IOException, GeneralSecurityException {
-        byte[] encoded = org.apache.tomcat.util.codec.binary.Base64.decodeBase64(PRIVATE_KEY_STRING);
+        byte[] encoded = Base64.decodeBase64(PRIVATE_KEY_STRING);
         KeyFactory kf = KeyFactory.getInstance(ALGORITHM);
         PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(encoded);
         return (RSAPrivateKey) kf.generatePrivate(keySpec);
+    }
+
+    public boolean verifySignature(String messageToVerify, String IncomingSignature) {
+        boolean isSignatureValid = false;
+        try{
+            isSignatureValid = verifyDigitalSignature(messageToVerify, IncomingSignature);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return isSignatureValid;
+    }
+
+    private boolean verifyDigitalSignature(String messageToVerify, String IncomingSignature) throws Exception {
+        Signature signature = Signature.getInstance(SIGNING_ALGORITHM);
+        signature.initVerify(getPublicKeyFromString());
+        signature.update(messageToVerify.getBytes());
+        return signature.verify(Base64.decodeBase64(IncomingSignature.getBytes()));
+    }
+
+    private static RSAPublicKey getPublicKeyFromString() throws  IOException, GeneralSecurityException {
+        byte[] encode = Base64.decodeBase64(PUBLIC_KEY_STRING);
+        KeyFactory kf = KeyFactory.getInstance(ALGORITHM);
+        return (RSAPublicKey) kf.generatePublic(new X509EncodedKeySpec(encode));
     }
 }
