@@ -29,7 +29,7 @@ public class StatementController {
     public ResponseEntity<String> statement(@RequestBody String statementReq) {
         LinkedHashMap<String, Object> requestData = new LinkedHashMap<>();
         String responseMessage = "";
-
+        log.info("Request Received");
         if (!this.helper.validateXmlSchema("C:\\Users\\costa\\Documents\\Projects\\xmlAPI\\src\\main\\resources\\StatementReq.xsd", statementReq)) {
             responseMessage = this.helper.getResponseMessage("TARATZT", "TANZTZT", this.helper.getRandomMessageId(), this.helper.getCurrentDateTime(), this.helper.getResponseStatus("RGS004"), "RGS004", this.helper.getResponseDescription("RGS004"));
             return new ResponseEntity<>(this.helper.DocumentToXml(this.helper.signRequestAndGetFullResponse(responseMessage)), HttpStatus.OK);

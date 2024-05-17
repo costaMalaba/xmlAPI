@@ -2,6 +2,9 @@ package com.cymstarlink.xmlAPI.config;
 
 import com.cymstarlink.xmlAPI.entities.ResponseCodeEntity;
 import com.cymstarlink.xmlAPI.services.ResponseCodeService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
+import okhttp3.*;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.dom4j.Document;
@@ -27,14 +30,14 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
 
 @Service
+@Slf4j
 public class HelperConfig {
 
-    private final ResponseCodeService responseCodeService;
     private static final String SIGNING_ALGORITHM = "SHA1withRSA";
     private static final String ALGORITHM = "RSA";
-
     private static final String PRIVATE_KEY_STRING = "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC1YUm4CxIGaMLc\n" +
             "Nk5coYuQzwKXQMrbRiMKGiS0IWrYGzsVtJBbhswAWkFRFAqLX+Sf6mLeahiAtKc3\n" +
             "adAvs0rdBifyIEZ4/y9mCAbJmckErmCErbcMOeaPI1mMOtgUaCmomxU+vDhdukA6\n" +
@@ -61,7 +64,6 @@ public class HelperConfig {
             "AM4EQFQScPUtLeOMYzYu0kRmbcgvPdtBDEIJegtTM9fwppKuMJ0ET+V+Gsrz2T9j\n" +
             "m0lMw+42MMOlynUDP47+DLH78F4In6yaExvlkRsUUgV605W4RJuztwuXG3kCxLhZ\n" +
             "dd1M1zpdMQCktBb3gThGLko=";
-
     private static final String PUBLIC_KEY_STRING = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtWFJuAsSBmjC3DZOXKGL\n" +
             "kM8Cl0DK20YjChoktCFq2Bs7FbSQW4bMAFpBURQKi1/kn+pi3moYgLSnN2nQL7NK\n" +
             "3QYn8iBGeP8vZggGyZnJBK5ghK23DDnmjyNZjDrYFGgpqJsVPrw4XbpAOvmB+SFn\n" +
@@ -69,9 +71,27 @@ public class HelperConfig {
             "GZTOpFHbYbkjTHeEuZFFnx/jljD3jyLWUm0ZaCYBizLIUnXpFg58qQBVYWJyavhn\n" +
             "4n9rB9NfxUXTDDh65qgbpVI9qFbRVndLV2NHSOr7JaGPhdPPN/dAWcaz8qJ61bVg\n" +
             "VQIDAQAB";
+    private final ResponseCodeService responseCodeService;
+    private final OkHttpClient client;
+    private final ObjectMapper objectMapper;
 
-    public HelperConfig(ResponseCodeService responseCodeService) {
+    public HelperConfig(ResponseCodeService responseCodeService, OkHttpClient client, ObjectMapper objectMapper) {
         this.responseCodeService = responseCodeService;
+        this.client = client;
+        this.objectMapper = objectMapper;
+    }
+
+    private static RSAPrivateKey getPrivateKeyFromString() throws IOException, GeneralSecurityException {
+        byte[] encoded = Base64.decodeBase64(PRIVATE_KEY_STRING);
+        KeyFactory kf = KeyFactory.getInstance(ALGORITHM);
+        PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(encoded);
+        return (RSAPrivateKey) kf.generatePrivate(keySpec);
+    }
+
+    private static RSAPublicKey getPublicKeyFromString() throws IOException, GeneralSecurityException {
+        byte[] encode = Base64.decodeBase64(PUBLIC_KEY_STRING);
+        KeyFactory kf = KeyFactory.getInstance(ALGORITHM);
+        return (RSAPublicKey) kf.generatePublic(new X509EncodedKeySpec(encode));
     }
 
     public boolean validateXmlSchema(String xsdPath, String xmlMessage) {
@@ -130,7 +150,7 @@ public class HelperConfig {
     }
 
     public String getCurrentDateTime() {
-        DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-mm-dd'T'HH:mm:ss");
+        DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
         LocalDateTime localDateTime = LocalDateTime.now();
         return dateTimeFormatter.format(localDateTime);
     }
@@ -174,20 +194,13 @@ public class HelperConfig {
         Signature signature = Signature.getInstance(SIGNING_ALGORITHM);
         signature.initSign(getPrivateKeyFromString());
         signature.update(messageToSign.trim().getBytes(StandardCharsets.UTF_8));
-        byte[] messageSignature =signature.sign();
+        byte[] messageSignature = signature.sign();
         return java.util.Base64.getEncoder().encodeToString(messageSignature);
-    }
-
-    private static RSAPrivateKey getPrivateKeyFromString() throws IOException, GeneralSecurityException {
-        byte[] encoded = Base64.decodeBase64(PRIVATE_KEY_STRING);
-        KeyFactory kf = KeyFactory.getInstance(ALGORITHM);
-        PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(encoded);
-        return (RSAPrivateKey) kf.generatePrivate(keySpec);
     }
 
     public boolean verifySignature(String messageToVerify, String IncomingSignature) {
         boolean isSignatureValid = false;
-        try{
+        try {
             isSignatureValid = verifyDigitalSignature(messageToVerify, IncomingSignature);
         } catch (Exception e) {
             e.printStackTrace();
@@ -202,9 +215,62 @@ public class HelperConfig {
         return signature.verify(Base64.decodeBase64(IncomingSignature.getBytes()));
     }
 
-    private static RSAPublicKey getPublicKeyFromString() throws  IOException, GeneralSecurityException {
-        byte[] encode = Base64.decodeBase64(PUBLIC_KEY_STRING);
-        KeyFactory kf = KeyFactory.getInstance(ALGORITHM);
-        return (RSAPublicKey) kf.generatePublic(new X509EncodedKeySpec(encode));
+    public String sendHttpRequest(String rawRequest, String destinationUrl) {
+        RequestBody requestBody = RequestBody.create(MediaType.parse("application/json"), rawRequest);
+        Headers headers = new Headers.Builder()
+                .add("Authorization", "Bearer FLWSECK_TEST-2991bc3d56dcef572a6e9325929df4ce-X")
+                .build();
+        return sendClientRequest(destinationUrl, requestBody, headers, client);
+    }
+
+    public String sendClientRequest(String url, RequestBody requestBody, Headers headers, OkHttpClient client) {
+        String response;
+        Request request = new Request.Builder()
+                .url(url)
+                .post(requestBody)
+                .headers(headers)
+                .build();
+        Call httpRequestCall = client.newCall(request);
+        try {
+            Response httpCallResponse = httpRequestCall.execute();
+            response = httpCallResponse.body().string();
+        } catch (Exception e) {
+            e.printStackTrace();
+            response = "EXCEPTION - " + e.getMessage();
+        }
+        return response;
+    }
+
+    //    String tx_ref, String amount, String  currency, String redirect_url, String consumer_id, String consumer_mac, String email, String phoneNumber, String name
+    public String flutterWaveCheckOut(String tx_ref, String amount, String email) {
+        LinkedHashMap<String, Object> data = new LinkedHashMap<>();
+        LinkedHashMap<String, Object> metaData = new LinkedHashMap<>();
+        LinkedHashMap<String, Object> customerData = new LinkedHashMap<>();
+        LinkedHashMap<String, Object> customizationsData = new LinkedHashMap<>();
+        data.put("tx_ref", tx_ref);
+        data.put("amount", amount);
+        data.put("currency", "TZS");
+        data.put("redirect_url", "https://the-scenery-tz.onrender.com");
+
+        metaData.put("consumer_id", 12);
+        metaData.put("consumer_mac", "92a3-912ba-1192a");
+        data.put("meta", metaData);
+
+        customerData.put("email", email);
+        customerData.put("phonenumber", "255747088007");
+        customerData.put("name", "Costantine Yohana");
+        data.put("customer", customerData);
+
+        customizationsData.put("title", "The Scenery");
+        customizationsData.put("logo", "http://www.piedpiper.com/app/themes/joystick-v27/images/logo.png");
+        customizationsData.put("description", "Enjoy Our Services Daily.");
+        data.put("customizations", customizationsData);
+
+        try {
+            return objectMapper.writeValueAsString(data);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 }
