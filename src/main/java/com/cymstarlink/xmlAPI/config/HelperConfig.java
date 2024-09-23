@@ -1,7 +1,10 @@
 package com.cymstarlink.xmlAPI.config;
 
 import com.cymstarlink.xmlAPI.entities.ResponseCodeEntity;
+import com.cymstarlink.xmlAPI.entities.ValidationRequestEntity;
+import com.cymstarlink.xmlAPI.services.EmailService;
 import com.cymstarlink.xmlAPI.services.ResponseCodeService;
+import com.cymstarlink.xmlAPI.services.ValidationRequestService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.*;
@@ -74,11 +77,15 @@ public class HelperConfig {
     private final ResponseCodeService responseCodeService;
     private final OkHttpClient client;
     private final ObjectMapper objectMapper;
+    private final ValidationRequestService validationRequestService;
+    private final EmailService emailService;
 
-    public HelperConfig(ResponseCodeService responseCodeService, OkHttpClient client, ObjectMapper objectMapper) {
+    public HelperConfig(ResponseCodeService responseCodeService, OkHttpClient client, ObjectMapper objectMapper, ValidationRequestService validationRequestService, EmailService emailService) {
         this.responseCodeService = responseCodeService;
         this.client = client;
         this.objectMapper = objectMapper;
+        this.validationRequestService = validationRequestService;
+        this.emailService = emailService;
     }
 
     private static RSAPrivateKey getPrivateKeyFromString() throws IOException, GeneralSecurityException {
@@ -133,6 +140,14 @@ public class HelperConfig {
                 "</ResponseSummary>\n" +
                 "</RgsAck>";
         return rawResponse;
+    }
+
+    public void saveValidationRequest(Long controlNumber, String rawRequest) {
+        ValidationRequestEntity validationRequestEntity = new ValidationRequestEntity();
+        validationRequestEntity.setId(0);
+        validationRequestEntity.setControlNumber(controlNumber);
+        validationRequestEntity.setRawRequest(rawRequest);
+        validationRequestService.save(validationRequestEntity);
     }
 
     public String DocumentToXml(String xmlstring) {
@@ -235,7 +250,6 @@ public class HelperConfig {
             Response httpCallResponse = httpRequestCall.execute();
             response = httpCallResponse.body().string();
         } catch (Exception e) {
-            e.printStackTrace();
             response = "EXCEPTION - " + e.getMessage();
         }
         return response;
@@ -272,5 +286,30 @@ public class HelperConfig {
             e.printStackTrace();
             return null;
         }
+    }
+
+    public String sendMail(String to, String subject, String text) {
+        String response = "";
+        try {
+            emailService.sendMail(to, subject, text);
+            response = "Email Sent Successfully";
+        } catch (Exception e) {
+            log.info("EXCEPTION - {}", e.getMessage());
+            response = e.getMessage();
+            e.printStackTrace();
+        }
+        return response;
+    }
+
+    public String sendHtmlMail(String to, String subject, String templateName) {
+        String response = "";
+        try {
+            emailService.sendHtmlMail(to, subject, templateName);
+            response = "Email Sent Successfully";
+        } catch (Exception e) {
+            log.info("EXCEPTION - {}", e.getMessage());
+            response = e.getMessage();
+        }
+        return response;
     }
 }

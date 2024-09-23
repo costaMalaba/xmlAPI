@@ -30,14 +30,14 @@ public class StatementController {
         LinkedHashMap<String, Object> requestData = new LinkedHashMap<>();
         String responseMessage = "";
         log.info("Request Received");
-//        if (!this.helper.validateXmlSchema("C:\\Users\\costa\\Documents\\Projects\\xmlAPI\\src\\main\\resources\\StatementReq.xsd", statementReq)) {
-//            responseMessage = this.helper.getResponseMessage("TARATZT", "TANZTZT", this.helper.getRandomMessageId(), this.helper.getCurrentDateTime(), this.helper.getResponseStatus("RGS004"), "RGS004", this.helper.getResponseDescription("RGS004"));
-//            return new ResponseEntity<>(this.helper.DocumentToXml(this.helper.signRequestAndGetFullResponse(responseMessage)), HttpStatus.OK);
-//        }
-        if (!this.helper.validateXmlSchema("/api/xsd/StatementReq.xsd", statementReq)) {
+        if (!this.helper.validateXmlSchema("/home/cits/Desktop/costa/cymStarLink/xmlAPI/src/main/resources/StatementReq.xsd", statementReq)) {
             responseMessage = this.helper.getResponseMessage("TARATZT", "TANZTZT", this.helper.getRandomMessageId(), this.helper.getCurrentDateTime(), this.helper.getResponseStatus("RGS004"), "RGS004", this.helper.getResponseDescription("RGS004"));
             return new ResponseEntity<>(this.helper.DocumentToXml(this.helper.signRequestAndGetFullResponse(responseMessage)), HttpStatus.OK);
         }
+//        if (!this.helper.validateXmlSchema("/api/xsd/StatementReq.xsd", statementReq)) {
+//            responseMessage = this.helper.getResponseMessage("TARATZT", "TANZTZT", this.helper.getRandomMessageId(), this.helper.getCurrentDateTime(), this.helper.getResponseStatus("RGS004"), "RGS004", this.helper.getResponseDescription("RGS004"));
+//            return new ResponseEntity<>(this.helper.DocumentToXml(this.helper.signRequestAndGetFullResponse(responseMessage)), HttpStatus.OK);
+//        }
         try {
             Document document = DocumentHelper.parseText(statementReq);
             List<Node> headerNodes = document.selectNodes("/Rgs/Statement/Header");
